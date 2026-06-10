@@ -221,6 +221,7 @@ def on_cancel_click():
 def on_engine_change(tts_engine):
     global langs_voices
     tts_name = tts_engine.lower()
+    workers_update = gr.update()
     
     if tts_name == "azure":
         if not AZURE_TTS_KEY or not AZURE_TTS_REGION:
@@ -228,7 +229,8 @@ def on_engine_change(tts_engine):
                        title="Azure Key Unconfigured")
             return (
                 gr.update(choices=[], value=None),
-                gr.update(choices=[], value=None)
+                gr.update(choices=[], value=None),
+                workers_update
             )
         try:
             langs_voices = helpers.get_langs_voices_azure(AZURE_TTS_KEY, AZURE_TTS_REGION)
@@ -237,11 +239,24 @@ def on_engine_change(tts_engine):
                        title="Failed to load Azure voices")
             return (
                 gr.update(choices=[], value=None),
-                gr.update(choices=[], value=None)
+                gr.update(choices=[], value=None),
+                workers_update
             )
         
     elif tts_name == "kokoro":
         langs_voices = helpers.get_langs_voices_kokoro()
+    elif tts_name == "edge_tts":
+        workers_update = gr.update(value=2)
+        try:
+            langs_voices = helpers.get_langs_voices_edge_tts()
+        except Exception as e:
+            gr.Warning(message=str(e),
+                       title="Failed to load Edge TTS voices")
+            return (
+                gr.update(choices=[], value=None),
+                gr.update(choices=[], value=None),
+                workers_update
+            )
     
     lang_choices = list(langs_voices.keys())
     default_lang = "en-US" if "en-US" in lang_choices else next(iter(lang_choices), None)
@@ -249,7 +264,8 @@ def on_engine_change(tts_engine):
 
     return (
         gr.update(choices=lang_choices, value=default_lang),
-        gr.update(choices=voice_choices, value=voice_choices[0] if voice_choices else None)
+        gr.update(choices=voice_choices, value=voice_choices[0] if voice_choices else None),
+        workers_update
     )
 
 
@@ -305,7 +321,7 @@ def launch_gui(host: str = "127.0.0.1", port: int = 7860):
                 # TTS settings
                 with gr.Accordion("🎙 TTS Settings", open=True, elem_id="tts_sets"):
                     with gr.Row(equal_height=True):
-                        tts_engine = gr.Dropdown(choices=["Azure", "Kokoro"],
+                        tts_engine = gr.Dropdown(choices=["Azure", "Kokoro", "edge_tts"],
                                                 label="TTS Engine",
                                                 value=None,
                                                 interactive=True
@@ -385,7 +401,7 @@ def launch_gui(host: str = "127.0.0.1", port: int = 7860):
 
         # Events
         input_file.change(fn=run_preview, inputs=input_file, outputs=preview_output)
-        tts_engine.change(fn=on_engine_change, inputs=tts_engine, outputs=[tts_lang, tts_voice])
+        tts_engine.change(fn=on_engine_change, inputs=tts_engine, outputs=[tts_lang, tts_voice, max_workers])
         tts_lang.change(fn=on_lang_change, inputs=tts_lang, outputs=tts_voice)
         run_btn.click(
             fn=on_run_click,

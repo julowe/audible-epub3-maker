@@ -53,13 +53,14 @@ def parse_args():
     parser.add_argument(
         "--tts_engine",
         type=str.lower,
-        choices=["azure", "kokoro"],
+        choices=["azure", "kokoro", "edge_tts"],
         default="azure",
         help=(
             "TTS engine to use (default: azure). \n"
             "Voice & language references: \n"
             "  Azure: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts \n"
-            "  Kokoro: https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md"
+            "  Kokoro: https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md \n"
+            "  Edge TTS: https://github.com/rany2/edge-tts"
         )
     )
 
@@ -167,6 +168,21 @@ def apply_tts_defaults(args: dict) -> dict:
         voices = langs_voices.get(out.get("tts_lang"), [])
         if not out.get("tts_voice") and voices:
             out["tts_voice"] = voices[0]
+    elif engine == "edge_tts":
+        langs_voices = {}
+        try:
+            langs_voices = helpers.get_langs_voices_edge_tts()
+        except Exception:
+            # Edge TTS voice list requires network. Keep resilient defaults when unavailable.
+            pass
+
+        lang_choices = list(langs_voices.keys())
+        default_lang = "en-US" if "en-US" in lang_choices else next(iter(lang_choices), "en-US")
+        if not out.get("tts_lang"):
+            out["tts_lang"] = default_lang
+        voices = langs_voices.get(out.get("tts_lang"), [])
+        if not out.get("tts_voice"):
+            out["tts_voice"] = voices[0] if voices else "en-US-AriaNeural"
     else:
         if not out.get("tts_lang"):
             out["tts_lang"] = "en-US"

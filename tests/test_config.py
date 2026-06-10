@@ -1,4 +1,5 @@
 from audible_epub3_maker import config
+from unittest.mock import patch
 
 def test_azure_tts_config():
     assert config.AZURE_TTS_KEY, "AZURE_TTS_KEY is not set"
@@ -26,3 +27,8 @@ def test_apply_tts_defaults():
     out = apply_tts_defaults(custom)
     assert out["tts_lang"] == "b"
     assert out["tts_voice"] == "bf_lily"
+
+    with patch("audible_epub3_maker.utils.helpers.get_langs_voices_edge_tts", return_value={"en-US": ["en-US-AriaNeural"]}):
+        out = apply_tts_defaults({"tts_engine": "edge_tts"})
+        assert out["tts_lang"] == "en-US"
+        assert out["tts_voice"] == "en-US-AriaNeural"
