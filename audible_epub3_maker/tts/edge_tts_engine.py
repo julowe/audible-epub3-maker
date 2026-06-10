@@ -15,6 +15,7 @@ from audible_epub3_maker.utils.constants import BEAUTIFULSOUP_PARSER
 from audible_epub3_maker.utils.types import WordBoundary, TTSEmptyAudioError, TTSEmptyContentError
 
 logger = logging.getLogger(__name__)
+EDGE_TTS_TIME_UNIT_TO_MS = 10000.0
 
 
 def _parse_edge_tts_voice_output(raw_output: str) -> dict[str, list[str]]:
@@ -30,7 +31,7 @@ def _parse_edge_tts_voice_output(raw_output: str) -> dict[str, list[str]]:
             return
 
         # edge-tts voice names use the format: <lang>-<region>-<voice>
-        # e.g. en-US-AvaMultilingualNeural
+        # e.g. en-US-AriaNeural
         parts = voice_name.split("-")
         if len(parts) < 3:
             return
@@ -50,7 +51,7 @@ def _parse_edge_tts_voice_output(raw_output: str) -> dict[str, list[str]]:
     flush_current_voice()
 
     if not langs_voices:
-        raise ValueError("No usable voices were found in edge_tts --list-voices output.")
+        raise ValueError("No usable voices were found in Edge TTS --list-voices output.")
 
     return {
         lang: sorted(voices)
@@ -118,8 +119,8 @@ class EdgeTTS(BaseTTS):
             if chunk_type == "audio":
                 audio.extend(chunk.get("data", b""))
             elif chunk_type == "WordBoundary":
-                offset = float(chunk.get("offset", 0.0)) / 10000
-                duration = float(chunk.get("duration", 0.0)) / 10000
+                offset = float(chunk.get("offset", 0.0)) / EDGE_TTS_TIME_UNIT_TO_MS
+                duration = float(chunk.get("duration", 0.0)) / EDGE_TTS_TIME_UNIT_TO_MS
                 text_token = str(chunk.get("text", "")).strip()
                 if text_token:
                     word_boundaries.append(
@@ -143,9 +144,13 @@ class EdgeTTS(BaseTTS):
 
         try:
             audio_data, word_boundaries = asyncio.run(self._synthesize(plain_text))
-        except (NoAudioReceived, WebSocketError, UnexpectedResponse, UnknownResponse, ValueError, TypeError) as e:
+        except (NoAudioReceived, WebSocketError, UnexpectedResponse, UnknownResponse) as e:
             raise RuntimeError(
                 "Edge TTS synthesis failed. Please verify the selected language/voice and try again."
+            ) from e
+        except ValueError as e:
+            raise RuntimeError(
+                "Edge TTS received invalid synthesis settings. Please verify language, voice, and speed values."
             ) from e
 
         if not audio_data:

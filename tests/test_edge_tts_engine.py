@@ -70,15 +70,21 @@ def test_edge_tts_html_to_speech_raises_for_empty_text(tmp_path: Path) -> None:
 
 
 def test_edge_tts_html_to_speech_handles_websocket_failure(tmp_path: Path) -> None:
+    class FailingAsyncIterator:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            raise WebSocketError("connection failed")
+
     class FailingCommunicate:
         def __init__(self, text: str, voice: str, rate: str):
             self._text = text
             self._voice = voice
             self._rate = rate
 
-        async def stream(self):
-            raise WebSocketError("connection failed")
-            yield {"type": "audio", "data": b""}
+        def stream(self):
+            return FailingAsyncIterator()
 
     with patch("audible_epub3_maker.tts.edge_tts_engine.edge_tts_lib.Communicate", new=FailingCommunicate):
         with pytest.raises(RuntimeError, match="Edge TTS synthesis failed"):

@@ -124,10 +124,15 @@ def run_generation(input_file, output_dir, output_filename, title_suffix, log_le
 
     if aem_process and aem_process.poll() is None:
         raise RuntimeError(f"AEM process [PID={aem_process.pid}] is already running. Please do not start it again.")
+
+    input_path = Path(str(input_file)).expanduser().resolve()
+    if not input_path.is_file():
+        raise ValueError(f"Input file not found: {input_path}")
+    if input_path.suffix.lower() != ".epub":
+        raise ValueError(f"Input file must be an EPUB file (.epub), got: {input_path.name}")
     
     args = [
         sys.executable, "main.py",
-        str(input_file),
         "-d", str(output_dir) if output_dir else "",
         "-o", output_filename or "",
         "--title_suffix", title_suffix or "",
@@ -140,7 +145,9 @@ def run_generation(input_file, output_dir, output_filename, title_suffix, log_le
         "--newline_mode", newline_mode,
         "--align_threshold", str(align_threshold),
         "--max_workers", str(max_workers),
-        "--force"
+        "--force",
+        "--",
+        str(input_path),
     ]
     if cleanup:
         args.append("--cleanup")
