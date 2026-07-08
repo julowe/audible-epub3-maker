@@ -308,6 +308,12 @@ def get_langs_voices_kokoro():
     # Kokoro doesn't support word boundaries for non-English languages.
     return langs_voices
 
+
+def get_langs_voices_edge_tts() -> dict[str, list[str]]:
+    from audible_epub3_maker.tts.edge_tts_engine import get_langs_voices_edge_tts as _get_langs_voices_edge_tts
+
+    return _get_langs_voices_edge_tts()
+
 def validate_tts_settings():
     if "azure" == settings.tts_engine:
         langs_voices = get_langs_voices_azure(AZURE_TTS_KEY, AZURE_TTS_REGION)
@@ -344,6 +350,23 @@ def validate_tts_settings():
         if voice not in langs_voices_lowers[lang]:
             raise ValueError(
                 f"Kokoro TTS does not support voice '{settings.tts_voice}' for language '{settings.tts_lang}'"
+            )
+    elif "edge_tts" == settings.tts_engine:
+        langs_voices = get_langs_voices_edge_tts()
+        langs_voices_lowers = {
+            lang.lower(): [v.lower() for v in voices]
+            for lang, voices in langs_voices.items()
+        }
+
+        lang = settings.tts_lang.lower()
+        voice = settings.tts_voice.lower()
+
+        if lang not in langs_voices_lowers:
+            raise ValueError(f"Edge TTS does not support language: {settings.tts_lang}")
+
+        if voice not in langs_voices_lowers[lang]:
+            raise ValueError(
+                f"Edge TTS does not support voice '{settings.tts_voice}' for language '{settings.tts_lang}'"
             )
     else:
         raise ValueError(f"Unsupported TTS engine: {settings.tts_engine}")

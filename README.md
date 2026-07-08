@@ -1,6 +1,6 @@
 # 🎧 Audible EPUB3 Maker
 
-Generate audiobooks from plain EPUB files in **EPUB3 Media Overlays** format using high-quality TTS (Text-to-Speech) engines like **Azure** and **Kokoro**, now with an intuitive **Web GUI**.
+Generate audiobooks from plain EPUB files in **EPUB3 Media Overlays** format using high-quality TTS (Text-to-Speech) engines like **Azure**, **Kokoro**, and **Edge TTS**, now with an intuitive **Web GUI**.
 
 You can read or listen to the generated EPUB using any ebook reader that supports EPUB 3 Media Overlays, such as Thorium Reader. The generated MP3 files can also be played with any standard audio player.
 
@@ -12,6 +12,7 @@ You can read or listen to the generated EPUB using any ebook reader that support
 - Supports TTS engines:
   - [Azure TTS](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/get-started-text-to-speech) (high-quality cloud service)
   - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (offline open-source model, currently supports English text alignment only)
+  - [Edge TTS](https://github.com/rany2/edge-tts) (cloud service)
 - Automatic sentence segmentation and force alignment
 - Parallel multi-process generation
 - Gradio-based Web GUI for easy interaction without command line
@@ -120,7 +121,7 @@ python main.py <input_file.epub> [options]
 | `-o`, `--output_filename` | Generated EPUB filename                      | original input filename     |
 | `--title_suffix`      | Suffix appended to the OPF `dc:title`            | empty                       |
 | `--log_level`         | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | INFO                     |
-| `--tts_engine`        | TTS engine (`azure` or `kokoro`)                 | azure                       |
+| `--tts_engine`        | TTS engine (`azure`, `kokoro`, or `edge_tts`)    | azure                       |
 | `--tts_lang`          | Language code                                    | azure → en-US; <br/>kokoro → first supported |
 | `--tts_voice`         | Voice name                                       | azure → en-US-AvaMultilingualNeural; <br/>kokoro → first voice for language |
 | `--tts_speed`         | Playback speed (e.g., 1.0 = normal)              | 1.0                         |

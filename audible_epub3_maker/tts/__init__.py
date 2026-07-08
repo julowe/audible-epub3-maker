@@ -9,5 +9,9 @@ def create_tts_engine(tts_name: str):
         from audible_epub3_maker.tts.kokoro_tts import KokoroTTS
         return KokoroTTS()
     
+    elif "edge_tts" == tts_name:
+        from audible_epub3_maker.tts.edge_tts_engine import EdgeTTS
+        return EdgeTTS()
+    
     else:
         raise ValueError(f"Unsupported TTS engine: {tts_name}")

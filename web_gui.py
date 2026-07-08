@@ -124,10 +124,15 @@ def run_generation(input_file, output_dir, output_filename, title_suffix, log_le
 
     if aem_process and aem_process.poll() is None:
         raise RuntimeError(f"AEM process [PID={aem_process.pid}] is already running. Please do not start it again.")
+
+    input_path = Path(str(input_file)).expanduser().resolve()
+    if not input_path.is_file():
+        raise ValueError(f"Input file not found: {input_path}")
+    if input_path.suffix.lower() != ".epub":
+        raise ValueError(f"Input file must be an EPUB file (.epub), got: {input_path.name}")
     
     args = [
         sys.executable, "main.py",
-        str(input_file),
         "-d", str(output_dir) if output_dir else "",
         "-o", output_filename or "",
         "--title_suffix", title_suffix or "",
@@ -140,7 +145,9 @@ def run_generation(input_file, output_dir, output_filename, title_suffix, log_le
         "--newline_mode", newline_mode,
         "--align_threshold", str(align_threshold),
         "--max_workers", str(max_workers),
-        "--force"
+        "--force",
+        "--",
+        str(input_path),
     ]
     if cleanup:
         args.append("--cleanup")
@@ -221,6 +228,7 @@ def on_cancel_click():
 def on_engine_change(tts_engine):
     global langs_voices
     tts_name = tts_engine.lower()
+    workers_update = gr.update()
     
     if tts_name == "azure":
         if not AZURE_TTS_KEY or not AZURE_TTS_REGION:
@@ -228,7 +236,8 @@ def on_engine_change(tts_engine):
                        title="Azure Key Unconfigured")
             return (
                 gr.update(choices=[], value=None),
-                gr.update(choices=[], value=None)
+                gr.update(choices=[], value=None),
+                workers_update
             )
         try:
             langs_voices = helpers.get_langs_voices_azure(AZURE_TTS_KEY, AZURE_TTS_REGION)
@@ -237,11 +246,24 @@ def on_engine_change(tts_engine):
                        title="Failed to load Azure voices")
             return (
                 gr.update(choices=[], value=None),
-                gr.update(choices=[], value=None)
+                gr.update(choices=[], value=None),
+                workers_update
             )
         
     elif tts_name == "kokoro":
         langs_voices = helpers.get_langs_voices_kokoro()
+    elif tts_name == "edge_tts":
+        workers_update = gr.update(value=2)
+        try:
+            langs_voices = helpers.get_langs_voices_edge_tts()
+        except Exception as e:
+            gr.Warning(message=str(e),
+                       title="Failed to load Edge TTS voices")
+            return (
+                gr.update(choices=[], value=None),
+                gr.update(choices=[], value=None),
+                workers_update
+            )
     
     lang_choices = list(langs_voices.keys())
     default_lang = "en-US" if "en-US" in lang_choices else next(iter(lang_choices), None)
@@ -249,7 +271,8 @@ def on_engine_change(tts_engine):
 
     return (
         gr.update(choices=lang_choices, value=default_lang),
-        gr.update(choices=voice_choices, value=voice_choices[0] if voice_choices else None)
+        gr.update(choices=voice_choices, value=voice_choices[0] if voice_choices else None),
+        workers_update
     )
 
 
@@ -305,7 +328,7 @@ def launch_gui(host: str = "127.0.0.1", port: int = 7860):
                 # TTS settings
                 with gr.Accordion("🎙 TTS Settings", open=True, elem_id="tts_sets"):
                     with gr.Row(equal_height=True):
-                        tts_engine = gr.Dropdown(choices=["Azure", "Kokoro"],
+                        tts_engine = gr.Dropdown(choices=["Azure", "Kokoro", "edge_tts"],
                                                 label="TTS Engine",
                                                 value=None,
                                                 interactive=True
@@ -385,7 +408,7 @@ def launch_gui(host: str = "127.0.0.1", port: int = 7860):
 
         # Events
         input_file.change(fn=run_preview, inputs=input_file, outputs=preview_output)
-        tts_engine.change(fn=on_engine_change, inputs=tts_engine, outputs=[tts_lang, tts_voice])
+        tts_engine.change(fn=on_engine_change, inputs=tts_engine, outputs=[tts_lang, tts_voice, max_workers])
         tts_lang.change(fn=on_lang_change, inputs=tts_lang, outputs=tts_voice)
         run_btn.click(
             fn=on_run_click,
