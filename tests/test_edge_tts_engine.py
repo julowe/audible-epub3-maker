@@ -1,6 +1,5 @@
-import subprocess
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from edge_tts.exceptions import WebSocketError
@@ -10,15 +9,12 @@ from audible_epub3_maker.utils.types import TTSEmptyContentError
 
 
 def test_get_langs_voices_edge_tts_happy_path() -> None:
-    voice_output = (
-        "Name: en-US-AriaNeural\n"
-        "Gender: Female\n\n"
-        "Name: en-US-GuyNeural\n"
-        "Gender: Male\n\n"
-        "Name: fr-FR-DeniseNeural\n"
-        "Gender: Female\n"
-    )
-    with patch("audible_epub3_maker.tts.edge_tts_engine.subprocess.run", return_value=Mock(stdout=voice_output)):
+    voices = [
+        {"ShortName": "en-US-AriaNeural", "Locale": "en-US"},
+        {"ShortName": "en-US-GuyNeural", "Locale": "en-US"},
+        {"ShortName": "fr-FR-DeniseNeural", "Locale": "fr-FR"},
+    ]
+    with patch("audible_epub3_maker.tts.edge_tts_engine.edge_tts_lib.list_voices", new=AsyncMock(return_value=voices)):
         langs_voices = get_langs_voices_edge_tts()
 
     assert langs_voices == {
@@ -28,16 +24,16 @@ def test_get_langs_voices_edge_tts_happy_path() -> None:
 
 
 def test_get_langs_voices_edge_tts_handles_cli_error() -> None:
-    with patch(
-        "audible_epub3_maker.tts.edge_tts_engine.subprocess.run",
-        side_effect=subprocess.CalledProcessError(1, "edge_tts"),
-    ):
+    with patch("audible_epub3_maker.tts.edge_tts_engine.edge_tts_lib.list_voices", new=AsyncMock(side_effect=RuntimeError("network down"))):
         with pytest.raises(RuntimeError, match="Failed to load Edge TTS voices"):
             get_langs_voices_edge_tts()
 
 
 def test_get_langs_voices_edge_tts_handles_malformed_cli_output() -> None:
-    with patch("audible_epub3_maker.tts.edge_tts_engine.subprocess.run", return_value=Mock(stdout="Gender: Female\n")):
+    with patch(
+        "audible_epub3_maker.tts.edge_tts_engine.edge_tts_lib.list_voices",
+        new=AsyncMock(return_value=[{"Gender": "Female"}]),
+    ):
         with pytest.raises(RuntimeError, match="Failed to parse Edge TTS voice list output"):
             get_langs_voices_edge_tts()
 

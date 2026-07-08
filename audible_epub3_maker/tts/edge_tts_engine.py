@@ -1,7 +1,5 @@
 import asyncio
 import logging
-import subprocess
-import sys
 from pathlib import Path
 
 import edge_tts as edge_tts_lib
@@ -18,40 +16,24 @@ logger = logging.getLogger(__name__)
 EDGE_TTS_TIME_UNIT_TO_MS = 10000.0
 
 
-def _parse_edge_tts_voice_output(raw_output: str) -> dict[str, list[str]]:
-    """Parse `edge_tts --list-voices` text output into language -> voices map."""
+def _group_edge_tts_voices(voices: list[dict]) -> dict[str, list[str]]:
+    """Group Edge TTS voice list API response into language -> voices map."""
     langs_voices: dict[str, set[str]] = {}
-    current_voice_name: str = ""
 
-    def flush_current_voice() -> None:
-        nonlocal current_voice_name
-        voice_name = current_voice_name.strip()
-        current_voice_name = ""
+    for voice in voices:
+        voice_name = str(voice.get("ShortName", "")).strip()
         if not voice_name:
-            return
-
-        # edge-tts voice names use the format: <lang>-<region>-<voice>
-        # e.g. en-US-AriaNeural
-        parts = voice_name.split("-")
-        if len(parts) < 3:
-            return
-
-        locale = "-".join(parts[:2])
-        langs_voices.setdefault(locale, set()).add(voice_name)
-
-    for line in raw_output.splitlines():
-        stripped = line.strip()
-        if not stripped:
-            flush_current_voice()
             continue
-
-        if stripped.startswith("Name:"):
-            current_voice_name = stripped.split(":", 1)[1].strip()
-
-    flush_current_voice()
+        locale = str(voice.get("Locale", "")).strip()
+        if not locale:
+            parts = voice_name.split("-")
+            if len(parts) >= 3:
+                locale = "-".join(parts[:2])
+        if locale:
+            langs_voices.setdefault(locale, set()).add(voice_name)
 
     if not langs_voices:
-        raise ValueError("No usable voices were found in Edge TTS --list-voices output.")
+        raise ValueError("No usable voices were found in Edge TTS voice list response.")
 
     return {
         lang: sorted(voices)
@@ -60,19 +42,18 @@ def _parse_edge_tts_voice_output(raw_output: str) -> dict[str, list[str]]:
 
 
 def get_langs_voices_edge_tts() -> dict[str, list[str]]:
-    """Return Edge TTS supported languages and voices using `--list-voices` CLI output."""
-    cmd = [sys.executable, "-m", "edge_tts", "--list-voices"]
+    """Return Edge TTS supported languages and voices from the edge_tts API."""
     try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-    except FileNotFoundError as e:
+        voice_list = asyncio.run(edge_tts_lib.list_voices())
+    except ImportError as e:
         raise RuntimeError("Edge TTS is not installed. Please install edge-tts and try again.") from e
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         raise RuntimeError(
             "Failed to load Edge TTS voices. Please check your network connection and try again."
         ) from e
 
     try:
-        return _parse_edge_tts_voice_output(result.stdout)
+        return _group_edge_tts_voices(voice_list)
     except ValueError as e:
         raise RuntimeError("Failed to parse Edge TTS voice list output.") from e
 
